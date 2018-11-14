@@ -1,6 +1,5 @@
 const crypto = require('crypto');
 const fs = require('fs');
-const assert = require('assert');
 
 const passphrase = 'AKSenejfkwnEjDniw';
 
@@ -19,21 +18,19 @@ function generateKeyPair() {
       passphrase: passphrase
     }
   });
-  // fs.writeFile('publicKey.pem', publicKey, () => {console.log('Wrote publicKey.pem.')})
-  // fs.writeFile('privateKey.pem', privateKey, () => {console.log('Wrote privateKey.pem.')})
-  console.log(publicKey);
-  console.log(privateKey);
+  fs.writeFile('publicKey.pem', publicKey, () => {console.log('Wrote publicKey.pem.')})
+  fs.writeFile('privateKey.pem', privateKey, () => {console.log('Wrote privateKey.pem.')})
 }
 
 // generateKeyPair();
 
-const algorithm = 'aes-256-cbc';
+const cipher_algorithm = 'aes-256-cbc';
 
 // return { ciphertext, iv }
 const encryptWithAES256CBC = (key, plaintext) => {
   let iv = Buffer.alloc(16);
   iv = Buffer.from(Array.prototype.map.call(iv, () => { return Math.floor(Math.random() * 256) }));
-  let cipher = crypto.createCipheriv(algorithm, key, iv);
+  let cipher = crypto.createCipheriv(cipher_algorithm, key, iv);
   let ciphertext = cipher.update(plaintext, 'utf8', 'hex');
   ciphertext += cipher.final('hex');
   return { ciphertext, iv: iv.toString('hex') };
@@ -41,28 +38,20 @@ const encryptWithAES256CBC = (key, plaintext) => {
 
 const decryptWithAES256CBC = (key, hexIV, ciphertext) => {
   let iv = Buffer.from(hexIV, 'hex')
-  let decipher = crypto.createDecipheriv(algorithm, key, iv);
+  let decipher = crypto.createDecipheriv(cipher_algorithm, key, iv);
   let plaintext = decipher.update(ciphertext, 'hex', 'utf8');
   plaintext += decipher.final('utf8');
   return plaintext;
 }
-
 
 // Diffie Hellman
 const generateSessionKeys = (clientKey) => {
   const dh = crypto.getDiffieHellman('modp5');
   const serverKey = dh.generateKeys();
   const sessionKey = dh.computeSecret(clientKey);
+  // { gb, gab }
   return { serverKey, sessionKey };
 }
-
-
-// const hmacAlgorithm = 'sha256';
-// const hmac = crypto.createHmac(hmacAlgorithm, 'a secret');
-
-// hmac.update('some data to hash');
-// let digest = hmac.digest('hex');
-// console.log(digest);
 
 function getPublicKey() {
   return fs.readFileSync('publicKey.pem', 'utf8');
@@ -85,6 +74,13 @@ const sha256 = function (data) {
   return hash.digest();
 }
 
+const hmac_algorithm = 'sha256';
+const hmac = (key, data) => {
+  const hmac = crypto.createHmac(hmac_algorithm, key);
+  hmac.update(data);
+  return hmac.digest('hex');
+}
+
 module.exports = {
   // RSA
   getPublicKey,
@@ -99,4 +95,7 @@ module.exports = {
   // AES-256-CBC
   encryptWithAES256CBC,
   decryptWithAES256CBC,
+
+  // HMAC with sha256
+  hmac
 }
