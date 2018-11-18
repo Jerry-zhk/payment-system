@@ -25,7 +25,6 @@ app.use((req, res, next) => {
   next();
 });
 
-
 app.use(ssl.setup);
 app.use(ssl.decryptRequestBody);
 app.use(ssl.encryptResponseJSON);
