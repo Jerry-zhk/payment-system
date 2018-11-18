@@ -14,6 +14,9 @@
   "license": "ISC",
   "dependencies": {
     "body-parser": "^1.18.3",
+    "cookie-parser": "^1.4.3",
+    "db-migrate": "^0.11.4",
+    "db-migrate-mysql": "^1.1.10",
     "express": "^4.16.4",
     "express-mung": "^0.5.1",
     "mysql": "^2.16.0",
