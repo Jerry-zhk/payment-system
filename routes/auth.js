@@ -56,6 +56,41 @@ router.post('/login', function (req, res, next) {
   })
 });
 
+router.get('/add-value', function (req, res, next){
+
+  var user_id = 2;
+  var cc_number = '4463915235847879';
+  var cvv = 779;
+  var expiration_date = '11/2023';
+  var cardholder = 'puisama';
+  var amount = 50;
+
+  con = getConnection();
+
+  con.query(`SELECT credit_limit FROM creditcard WHERE cc_number = '${cc_number}' AND cvv = ${cvv} AND expiration_date = '${expiration_date}' AND card_holder = '${cardholder}';`, function (err, result) {
+    if (err) throw err;
+
+    if (result.length === 0){
+      res.json({message: 'Credit card information invalid. Add-value process not complete!'})
+    } else if (result[0].credit_limit < amount) {
+      res.json({message: 'Amount exceeds credit limit. Add-value process not complete!'})
+    } else {
+      // NOT YET RECORD
+
+      //update credit card limit
+      con.query(`UPDATE creditcard SET credit_limit = credit_limit - ${amount} WHERE cc_number = '${cc_number}';`, function (err, result) {
+        if (err) throw err;
+      })
+
+      // update user account
+      con.query(`UPDATE account SET balance = balance + ${amount} WHERE user_id = '${user_id}';`, function (err, result) {
+        if (err) throw err;
+      })
+      res.json({message: 'Add-value process completed!'})
+    }
+  })
+})
+
 router.post('/ac-transaction', function (req, res, next){
 
   //const { to, amount } = req.body;
@@ -80,11 +115,11 @@ router.post('/ac-transaction', function (req, res, next){
       })
       
       //modify user balance
-      con.query(`UPDATE account SET balance = balance - '${amount}' WHERE user_id = '${user_id}';`, function (err, result){
+      con.query(`UPDATE account SET balance = balance - ${amount} WHERE user_id = '${user_id}';`, function (err, result){
         if (err) throw err;
       })
 
-      con.query(`UPDATE account SET balance = balance + '${amount}' WHERE user_id = '${to}';`, function (err, result){
+      con.query(`UPDATE account SET balance = balance + ${amount} WHERE user_id = '${to}';`, function (err, result){
         if (err) throw err;
       })
     }
