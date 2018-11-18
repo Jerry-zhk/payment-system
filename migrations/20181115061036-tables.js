@@ -22,21 +22,19 @@ exports.up = function(db) {
     salt: { type: 'string', notNull: true, unique: true },
     balance: { type: 'real', notNull: true}
   }).then(() => {
-    db.createTable('transaction',  {
-      user_id: { type: 'int', foreignKey: {
-        name: 'transaction_user_id_fk',
+    db.createTable('ac_transaction',  {
+      from: { type: 'int', notNull: true, foreignKey: {
+        name: 'transaction_from_fk',
         table: 'account',
         rules: {
           onDelete: 'RESTRICT',
           onUpdate: 'RESTRICT'
         },
-        mapping: { user_id: 'user_id'}}
+        mapping: {from: 'user_id'}}
       },
       transaction_id: { type: 'int', primaryKey: true, autoIncrement: true },
-      from: { type: 'string', notNull: true },
       to: { type: 'string', notNull: true },
       amount: { type: 'real', notNull: true },
-      method: { type: 'string', notNull: true },
       completion_time: { type: 'timestamp', notNull: true }
     })
   }).then(() => {
@@ -53,17 +51,29 @@ exports.up = function(db) {
         }
     })
   }).then(() => {
-    db.runSql("INSERT INTO account (username, password, salt, balance) values ('jerry', 'jchong', 'jer', '10'),('nick', 'nicpple', 'nic', '30');");
+    db.createTable('creditcard', {
+        cc_number: { type: 'string', primaryKey: true },
+        security_code: { type: 'int', notNull: true },
+        card_holder: { type: 'string', notNull: true },
+        expiration_date: { type: 'string', notNull: true },
+        balance: { type: 'real', notNull: true}
+    })
+  }).then(() => {
+    db.runSql("INSERT INTO account (username, password, salt, balance) values ('jerrysama', 'jchong', 'jer', '100'),('nicksama', 'nicpple', 'nic', '30');");
+  }).then(() => {
+    db.runSql("INSERT INTO creditcard () values ('4463915235847879', 779, 'puisama', '11/2023', 100),('4957102320090763', 101, 'willysama', '07/2022', 200);");
   })
 };
 
 exports.down = function(db) {
-  return db.dropTable('session')
+  return db.dropTable('creditcard')
     .then(() => {
-      db.dropTable('transaction');
+      db.dropTable('session')
+    }).then(() => {
+      db.dropTable('ac_transaction');
     }).then(() => {
       db.dropTable('account');
-    })
+    });
 };
 
 exports._meta = {

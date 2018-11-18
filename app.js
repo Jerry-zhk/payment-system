@@ -20,10 +20,10 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(ssl.setup);
-app.use(ssl.decryptRequestBody);
-app.use(ssl.encryptResponseJSON);
+// app.use(ssl.setup);
+// app.use(ssl.decryptRequestBody);
+// app.use(ssl.encryptResponseJSON);
 
-app.use('auth', AuthRoutes);
+app.use('/auth', AuthRoutes);
 
 module.exports = app;
