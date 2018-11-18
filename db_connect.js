@@ -4,13 +4,13 @@ const getConnection = () => {
   const con =  mysql.createConnection({
     host: 'localhost',
     user: 'root',
-    password: '',
+    password: 'root',
     database: 'securepay'
   });
   
   con.connect(function(err){
     if (err) throw err;
-    console.log("Connected");
+    console.log("Connected to database");
   });
   return con;  
 }
