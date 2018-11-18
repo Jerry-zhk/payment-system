@@ -2,6 +2,7 @@ const express = require('express');
 const app = express();
 const bodyParser = require('body-parser');
 const ssl = require('./ssl-like');
+const AuthRoutes = require('./routes/auth');
 
 
 app.use(bodyParser.json());
@@ -23,14 +24,6 @@ app.use(ssl.setup);
 app.use(ssl.decryptRequestBody);
 app.use(ssl.encryptResponseJSON);
 
-app.post('/pay', function (req, res, next) {
-  
-  const data = {
-    code : 0,
-    req_body: JSON.stringify(req.body)
-  }
-
-  return res.status(200).json(data);
-});
+app.use('auth', AuthRoutes);
 
 module.exports = app;

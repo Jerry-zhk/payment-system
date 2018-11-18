@@ -16,6 +16,7 @@
     "body-parser": "^1.18.3",
     "express": "^4.16.4",
     "express-mung": "^0.5.1",
+    "mysql": "^2.16.0",
     "node-rsa": "^1.0.1"
   }
 }
