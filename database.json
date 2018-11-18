@@ -1,0 +1,12 @@
+{
+  "dev": {
+    "host": "localhost",
+    "user": "root",
+    "password": "",
+    "database": "securepay",
+    "driver": "mysql",
+    "multipleStatements": true
+  },
+
+  "defaultEnv": "dev"
+}
