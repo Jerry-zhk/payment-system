@@ -1,7 +1,17 @@
 
 const express = require('express');
 const router = express.Router();
-const getConnection = require('./db_connect');
+
+const getConnection = require('../db_connect');
+const AuthMWs = require('../middlewares/auth');
+
+
+const con = getConnection();
+
+const cookieOptions = {
+  maxAge: 1000 * 60 * 60 * 8, // would expire after 8 hours
+  // httpOnly: true, // The cookie only accessible by the web server
+}
 
 const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 function makeid(length) {
@@ -15,10 +25,9 @@ function makeid(length) {
 
 function generateThenInsertSessionId(callback){
 // const generateThenInsertSessionId = (callback) => {
-  const con = getConnection();
   var session_id = makeid(30);
   con.query(`SELECT * FROM session WHERE session_id = '${session_id}';`, function (err, result, fields) {
-    if (err) throw err;
+    if (err) return res.status(500).json({message:err});
     if (result.length === 0) {
       callback(session_id);
     } else {
@@ -27,17 +36,16 @@ function generateThenInsertSessionId(callback){
   });
 }
 
-router.post('/login', function (req, res, next) {
-  console.log(req.body)
-  // //getting login credentials
-  const { username, pw } = req.body;
 
-  //connect to database
-  const con = getConnection();
+
+router.post('/login', function (req, res, next) {
+
+  //getting login credentials
+  const { username, pw } = req.body;
 
   //compare login credentials
   con.query(`SELECT user_id, username FROM account WHERE username = '${username}' AND  password = '${pw}';`, function (err, result, fields) {
-    if (err) throw err;
+    if (err) return res.status(500).json({message:err});
 
     if (result.length === 0) {
       res.json({ message: 'Incorrect user/password' });
@@ -46,12 +54,14 @@ router.post('/login', function (req, res, next) {
       //generate unique session id
       generateThenInsertSessionId(function (session_id){
         con.query(`INSERT INTO session () values ('${user_id}', '${session_id}');`, function (err, result) {
-          if (err) throw err;
 
-          res.json({ message: 'Success', user_id: user_id });
+          if (err) return res.status(500).json({message:err});
+          console.log(session_id);
+          res.cookie('session_id', session_id, cookieOptions);
+          res.json({ message: 'Success', 'user_id': user_id, 'session_id': session_id });
+
         });
       })
-      //
     }
   })
 });
@@ -126,16 +136,22 @@ router.post('/ac-transaction', function (req, res, next){
   })
 })
 
-router.post('/logout', function (req, res, next){
-  var user_id = 2;
+
+router.post('/logout', AuthMWs.isAuthenticated, function (req, res, next){
 
   //logout and remove session id
-  const con = getConnection();
-  con.query(`DELETE FROM session WHERE user_id = '${user_id}';`, function (err, result) {
-    if (err) throw err;
-    res.json({ message: 'User has logged out', 'user_id': user_id });
+  con.query(`DELETE FROM session WHERE user_id = '${req.user_id}';`, function (err, result) {
+    if (err) return res.status(500).json({message:err});
+    if(result.length === 0) return res.status(401).json({message: 'Not logged in'});
+    res.clearCookie('session_id');
+    res.json({ message: 'User has logged out' });
   })
 });
+
+
+router.post('/my-profile', AuthMWs.isAuthenticated, function(req, res, next){
+  res.status(200).json({ 'user_id': req.user_id });
+})
 
 
 module.exports = router;
