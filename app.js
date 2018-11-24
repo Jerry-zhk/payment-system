@@ -3,7 +3,9 @@ const app = express();
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
 const ssl = require('./middlewares/ssl-like');
-const AuthRoutes = require('./routes/auth');
+const clientRoutes = require('./routes/client');
+const APIRoutes = require('./routes/api');
+const eShopRoutes = require('./routes/eshop');
 
 app.use(bodyParser.json());
 app.use(cookieParser());
@@ -25,10 +27,14 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(ssl.setup);
-app.use(ssl.decryptRequestBody);
-app.use(ssl.encryptResponseJSON);
+const clientMiddlewares = [
+  ssl.setup,
+  ssl.decryptRequestBody,
+  ssl.encryptResponseJSON
+]
 
-app.use('/auth', AuthRoutes);
+app.use('/api',  APIRoutes);
+app.use('/eshop',  eShopRoutes);
+app.use('/client', clientMiddlewares, clientRoutes);
 
 module.exports = app;

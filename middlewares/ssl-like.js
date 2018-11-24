@@ -44,9 +44,10 @@ const setup = (req, res, next) => {
 // Decrypt data
 const decryptRequestBody = (req, res, next) => {
   const { session_id, data } = req.body;
+  const keys = sessions[session_id];
+  req.session_keys = keys;
   if (data) {
     const { ciphertext, iv } = data;
-    const keys = sessions[session_id];
     const plaintext = crypto.decryptWithAES256CBC(keys.cipherKey, iv, ciphertext);
     const dataWithHMAC = JSON.parse(plaintext);
     const hmacComputed = crypto.hmac(keys.hmacKey, dataWithHMAC.data)
@@ -55,7 +56,6 @@ const decryptRequestBody = (req, res, next) => {
       return res.status(400).json({ code: 1222 });
     }
     req.body = JSON.parse(dataWithHMAC.data);
-    req.session_keys = keys;
   }
   next();
 }

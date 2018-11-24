@@ -1,15 +1,22 @@
-const getConnection = require('../db_connect');
+const db = require('../db_connect');
 
-const isAuthenticated = (req, res, next) => {
+const isAuthenticated = async (req, res, next) => {
   const { session_id } = req.cookies;
-  if(!session_id) return res.status(200).json({ failure: true });
-  const conn = getConnection();
-  conn.query(`SELECT user_id FROM session WHERE session_id = '${session_id}'`, (err, result) => {
-    if(err) return res.status(401);
-    if(result.length === 0) return res.status(401).json({message: 'Invalid session id'});
-    req.user_id = result[0].user_id;
+  if(!session_id) return res.status(200).json({ no_credentials: true });
+
+  try{
+    // const conn = await db.getConnection();
+    const session = await db.query(`SELECT user_id FROM session WHERE session_id = ?`, session_id);
+    if(session.length === 0) {
+      res.clearCookie('session_id');
+      return res.status(200).json({error: 'Expired or Invalid session'});
+    }
+    req.user_id = session[0].user_id;
     next();
-  });
+  }catch(error){
+    console.log(error)
+    return res.status(500).json({ error: error });
+  }
 }
 
 module.exports = {

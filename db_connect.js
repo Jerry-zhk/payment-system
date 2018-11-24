@@ -1,18 +1,12 @@
-const mysql = require("mysql");
+const mysql = require("promise-mysql");
 
-const getConnection = () => {
-  const con =  mysql.createConnection({
-    host: 'localhost',
-    user: 'root',
-    password: 'root',
-    database: 'securepay'
-  });
-  
-  con.connect(function(err){
-    if (err) throw err;
-    console.log("Connected to database");
-  });
-  return con;  
-}
+const pool = mysql.createPool({
+  host: 'localhost',
+  user: 'root',
+  password: 'root',
+  database: 'securepay',
+  connectionLimit: 15
+});
 
-module.exports = getConnection;
+
+module.exports = pool;

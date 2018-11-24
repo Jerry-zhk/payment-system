@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const fs = require('fs');
+var scryptsy = require('scryptsy');
 
 const passphrase = 'AKSenejfkwnEjDniw';
 
@@ -74,12 +75,23 @@ const sha256 = function (data) {
   return hash.digest();
 }
 
+const scrypt = (key, salt) => {
+  return scryptsy(key, salt, 16384, 8, 1, 64).toString('hex');
+}
+
 const hmac_algorithm = 'sha256';
 const hmac = (key, data) => {
   const hmac = crypto.createHmac(hmac_algorithm, key);
   hmac.update(data);
   return hmac.digest('hex');
 }
+
+const randomBytes = (size) => {
+  if(size <= 0) throw new Error('Failed to create random bytes with size: ' + size);
+  const buf = Buffer.alloc(size);
+  return crypto.randomFillSync(buf).toString('hex')
+}
+
 
 module.exports = {
   // RSA
@@ -91,11 +103,15 @@ module.exports = {
 
   // hash
   sha256,
+  scrypt,
 
   // AES-256-CBC
   encryptWithAES256CBC,
   decryptWithAES256CBC,
 
   // HMAC with sha256
-  hmac
+  hmac,
+
+  // Random 
+  randomBytes
 }
