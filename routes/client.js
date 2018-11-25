@@ -175,6 +175,7 @@ router.post('/register', async (req, res) => {
 //   })
 // })
 
+
 router.post('/payment-info', async (req, res) => {
   try {
     const requestId = req.body.requestId;
@@ -252,7 +253,7 @@ router.post('/transactions', AuthMWs.isAuthenticated, async (req, res) => {
     let transactions = await db.query('\
       SELECT t.transaction_id, t.paid_at, pr.amount, pr.description, a.display_name as recipient_name \
       FROM transactions AS t, payment_request AS pr, account as a  \
-      WHERE t.payment_request_id = pr.request_id AND pr.recipient = a.user_id AND t.paid_by = ?;', req.user_id);
+      WHERE t.payment_request_id = pr.request_id AND pr.recipient = a.user_id AND t.paid_by = ? ORDER BY t.paid_at DESC;', req.user_id);
     res.json({ transactions: transactions});
   } catch (error) {
     return res.status(500).json({ error: error });
@@ -285,7 +286,12 @@ router.post('/create-request', AuthMWs.isAuthenticated, async (req, res) => {
 
 router.post('/payment-requests', AuthMWs.isAuthenticated, async (req, res) => {
   try {
-    let requests = await db.query('SELECT * FROM payment_request WHERE recipient = ?;', req.user_id);
+    let requests = await db.query('\
+      SELECT pr.*, IFNULL(t.transaction_count , 0) AS transaction_count, (expired_at < CURRENT_TIMESTAMP) AS expired \
+      FROM payment_request AS pr \
+      LEFT JOIN (SELECT payment_request_id, count(DISTINCT payment_request_id) AS transaction_count FROM transactions GROUP BY payment_request_id) AS t \
+      ON t.payment_request_id = pr.request_id \
+      WHERE pr.recipient = ? ORDER BY pr.created_at DESC;', req.user_id);
     res.json({ requests: requests});
   } catch (error) {
     console.log(error)
