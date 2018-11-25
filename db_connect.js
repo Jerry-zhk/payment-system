@@ -1,10 +1,11 @@
 const mysql = require("promise-mysql");
+const dbConfig = require('./database.json')
 
 const pool = mysql.createPool({
-  host: 'localhost',
-  user: 'root',
-  password: 'root',
-  database: 'securepay',
+  host: dbConfig.dev.host,
+  user: dbConfig.dev.user,
+  password: dbConfig.dev.password,
+  database: dbConfig.dev.database,
   connectionLimit: 15
 });
 

@@ -31,8 +31,8 @@ const items = [
 ];
 
 const apiKeys = {
-  access_key: '27ab452374c60f34237fe31eb2b7b4ff',
-  secret_key: 'a7156868479182cc27c0d4da9aae0748fe3ee626f81579a01b1b2e763f2c7bwi'
+  access_key: '27ab452374c60f14b17fe88eb2b7b4ff',
+  secret_key: 'd54f429393a5560d9e5c54173493bec05c48a8588ed9fb874b4090b67e1345b6'
 }
 
 function findItemById(id) {
@@ -66,8 +66,9 @@ router.post('/checkout', async (req, res) => {
   }
   let data = {
     access_key: apiKeys.access_key,
-    amount: total,
-    description: descriptions.join(', ')
+    amount: total.toFixed(2),
+    description: descriptions.join(', '),
+    lifetime: 2
   };
   const requestString = requestObjectToString(data);
   const hmac = crypto.hmac(Buffer.from(apiKeys.secret_key, 'hex'), Buffer.from(requestString));

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const crypto = require('../crypto');
 const db = require('../db_connect');
+const mysql = require('promise-mysql');
 
 const requestObjectToString = (requestObj) => {
   let items = [];
@@ -38,6 +39,7 @@ router.get('/random-password', (req, res, next) => {
   res.json({salt: salt, pwd: pwd_hash});
 })
 
+
 router.post('/payment-request', async (req, res, next) => {
   const claimed_hmac = req.header('Authorization');
   if(!claimed_hmac) return res.status(400).send('Bad request');
@@ -46,6 +48,7 @@ router.post('/payment-request', async (req, res, next) => {
 
   try {
     const { access_key, amount, description } = req.body;
+    let lifetime = req.body.lifetime;
     // const conn = await db.getConnection();
     let user = await db.query('SELECT user_id, secret_key FROM account WHERE access_key = ?;', access_key);
     if(user.length === 0) return res.status(401).json({ message: 'Unauthorized' });
@@ -55,21 +58,23 @@ router.post('/payment-request', async (req, res, next) => {
     const hmac = crypto.hmac(Buffer.from(secret_key, 'hex'), Buffer.from(requestString));
     if(claimed_hmac !== hmac) return res.status(401).json({ message: 'Unauthorized' });
 
+    if(lifetime){
+      lifetime = parseInt(lifetime);
+    }else{
+      lifetime = 1
+    }
+    var EXPIRED_AT = { toSqlString: function() { return `NOW() + INTERVAL ${lifetime} HOUR`; } };
+
     // Insert request row
-    const insertRequest = await db.query('INSERT INTO payment_request (recipient, amount, description) values (?, ?, ?);', [user_id, amount, description]);
-    console.log(insertRequest)
-    res.json({success: true, request_id: insertRequest.insertId, url: `http://localhost:3000/pay/${insertRequest.insertId}`})
+    const insertRequest = await db.query('INSERT INTO payment_request (recipient, amount, description, expired_at) values (?, ?, ?, ?);', [user_id, amount, description, EXPIRED_AT]);
+    res.json({ request_id: insertRequest.insertId, url: `http://localhost:3000/pay/${insertRequest.insertId}`})
   } catch (error) {
     console.log(error)
-    return res.status(500).json({ message: error });
+    return res.status(500).json({ error: error });
   }
 
 });
 
-
-// router.get('/details', (req, res, next) => {
-//   res.json({success: '/details'});
-// });
 
 
 
