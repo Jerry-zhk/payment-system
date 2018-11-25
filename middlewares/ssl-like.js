@@ -16,7 +16,6 @@ const setup = (req, res, next) => {
         const publicKey = crypto.getPublicKey();
         return res.status(200).json({ code: 0, publicKey });
       case 'diffie-hellman':
-        console.log('diffie-hellman')
         // Diffie hellman keys for cipher
         const cipher_clientKey = crypto.decryptWithRSA(req.body.cipher_clientKey);
         const cipher_keys = crypto.generateSessionKeys(cipher_clientKey);

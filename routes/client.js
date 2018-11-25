@@ -259,6 +259,30 @@ router.post('/transactions', AuthMWs.isAuthenticated, async (req, res) => {
   }
 })
 
+router.post('/create-request', AuthMWs.isAuthenticated, async (req, res) => {
+  try {
+    const { amount, description } = req.body;
+    let lifetime = req.body.lifetime;
+
+    if(lifetime){
+      lifetime = parseInt(lifetime);
+    }else{
+      lifetime = 1
+    }
+    var EXPIRED_AT = { toSqlString: function() { return `NOW() + INTERVAL ${lifetime} HOUR`; } };
+
+    // Insert request row
+    const insertRequest = await db.query('INSERT INTO payment_request (recipient, amount, description, expired_at) values (?, ?, ?, ?);', [req.user_id, amount, description, EXPIRED_AT]);
+    let request = await db.query('SELECT * FROM payment_request WHERE request_id = ? LIMIT 1;', insertRequest.insertId);
+    if(request.length === 0) return res.json({ error: 'Database error' });
+    res.json({ request: request[0] });
+  } catch (error) {
+    console.log(error)
+    return res.status(500).json({ error: error });
+  }
+})
+
+
 router.post('/payment-requests', AuthMWs.isAuthenticated, async (req, res) => {
   try {
     let requests = await db.query('SELECT * FROM payment_request WHERE recipient = ?;', req.user_id);
@@ -267,7 +291,6 @@ router.post('/payment-requests', AuthMWs.isAuthenticated, async (req, res) => {
     console.log(error)
     return res.status(500).json({ error: error });
   }
-
 })
 
 

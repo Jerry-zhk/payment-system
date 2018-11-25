@@ -43,9 +43,7 @@ router.get('/random-password', (req, res, next) => {
 router.post('/payment-request', async (req, res, next) => {
   const claimed_hmac = req.header('Authorization');
   if(!claimed_hmac) return res.status(400).send('Bad request');
-  console.log(claimed_hmac)
   
-
   try {
     const { access_key, amount, description } = req.body;
     let lifetime = req.body.lifetime;
