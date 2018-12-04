@@ -96,7 +96,7 @@ router.post('/register', async (req, res) => {
     const result = await db.query('INSERT INTO session (user_id, session_id) values (?, ?);', [user_id, session_id]);
 
     res.cookie('session_id', session_id, cookieOptions);
-    res.json({ user: {user_id: user_id, username: username, display_name: 'dn', balance: 0} });
+    res.json({ user: {user_id: user_id, username: username, display_name: display_name, balance: 0} });
     
   } catch (error) {
     console.log(error)

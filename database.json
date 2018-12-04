@@ -2,7 +2,7 @@
   "dev": {
     "host": "localhost",
     "user": "root",
-    "password": "",
+    "password": "root",
     "database": "securepay",
     "driver": "mysql",
     "multipleStatements": true

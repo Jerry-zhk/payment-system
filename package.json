@@ -19,6 +19,7 @@
     "db-migrate-mysql": "^1.1.10",
     "express": "^4.16.4",
     "express-mung": "^0.5.1",
+    "joi": "^14.3.0",
     "node-fetch": "^2.3.0",
     "promise-mysql": "^3.3.1",
     "scryptsy": "^2.0.0"
