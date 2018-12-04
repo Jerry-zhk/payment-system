@@ -45,6 +45,9 @@ exports.up = function(db) {
             onUpdate: 'CASCADE'
           },
           mapping: {user_id: 'user_id'}}
+        },
+        csrf_token: {
+          type: 'string'
         }
     })
   }).then(() => {

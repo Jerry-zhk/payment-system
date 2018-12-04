@@ -5,6 +5,8 @@ const router = express.Router();
 const db = require('../db_connect');
 const AuthMWs = require('../middlewares/auth');
 const crypto = require('../crypto');
+const Joi = require('joi');
+const schemas = require('../schemas');
 
 
 // const con = getConnection();
@@ -27,32 +29,42 @@ function makeid(length) {
 router.post('/login', async (req, res, next) => {
 
   //getting login credentials
-  const { username, pw } = req.body;
+  const { error, value } = Joi.validate(req.body, {
+    username: schemas.username,
+    password: schemas.password
+  });
 
+  if (error) {
+    var errorDetails = error.details[0];
+    var msg = `${errorDetails.path.join('.')}: ${errorDetails.message}`;
+    return res.status(200).json({ error: msg });
+  }
+  const { username, password } = value;
   try {
     // const conn = await db.getConnection();
     let user = await db.query('SELECT user_id, username, display_name, balance, salt, password FROM account WHERE username = ?;', username);
-    if (user.length === 0) return res.json({ error: {username: 'Account does not exist...'} });
+    if (user.length === 0) return res.json({ error: { username: 'Account does not exist...' } });
     const user_id = user[0].user_id;
 
-    const hashed_password = crypto.scrypt(pw, user[0].salt);
-    if(hashed_password !== user[0].password) return res.json({ error: {password: 'Incorrect password'} });
-
+    const hashed_password = crypto.scrypt(password, user[0].salt);
+    if (hashed_password !== user[0].password) return res.json({ error: { password: 'Incorrect password' } });
+    console.log('logging in user ' + user_id);
     let deleteSession = await db.query('DELETE FROM session WHERE user_id = ?;', user_id);
     let unique = false;
     let session_id;
-    do{
+    do {
       session_id = makeid(126);
       let session = await db.query('SELECT * FROM session WHERE session_id = ?;', [session_id]);
       if (session.length === 0) unique = true;
-    }while(!unique);
+    } while (!unique);
 
     // Insert session 
-    const result = await db.query('INSERT INTO session (user_id, session_id) values (?, ?);', [user_id, session_id]);
+    const csrf_token = makeid(128);
+    const result = await db.query('INSERT INTO session (user_id, session_id, csrf_token) values (?, ?, ?);', [user_id, session_id, csrf_token]);
 
     res.cookie('session_id', session_id, cookieOptions);
-    res.json({ 'user': user[0] });
-    
+    res.json({ user: user[0] });
+
   } catch (error) {
     console.log(error)
     return res.status(200).json({ error: error });
@@ -60,19 +72,30 @@ router.post('/login', async (req, res, next) => {
 });
 
 router.post('/register', async (req, res) => {
-  const { username, display_name, password } = req.body;
+
+  const { error, value }  = Joi.validate(req.body, {
+    username: schemas.username,
+    display_name: schemas.display_name,
+    password: schemas.password
+  });
+  if (error) {
+    var errorDetails = error.details[0];
+    var msg = `${errorDetails.path.join('.')}: ${errorDetails.message}`;
+    return res.status(200).json({ error: msg });
+  }
+  const { username, display_name, password } = value;
   try {
     // const conn = await db.getConnection();
     let user = await db.query('SELECT user_id, username FROM account WHERE username = ?;', username);
-    if (user.length > 0) return res.json({ error: {username: 'Username has been used.'} });
-    
+    if (user.length > 0) return res.json({ error: { username: 'Username has been used.' } });
+
     let uniqueSalt = false;
     let salt;
-    do{
+    do {
       salt = makeid(64);
       let existingSalt = await db.query('SELECT salt FROM account WHERE salt = ?;', [salt]);
       if (existingSalt.length === 0) uniqueSalt = true;
-    }while(!uniqueSalt);
+    } while (!uniqueSalt);
 
 
     const hashed_password = crypto.scrypt(password, salt);
@@ -81,23 +104,24 @@ router.post('/register', async (req, res) => {
     const access_key = crypto.randomBytes(16)
     const secret_key = crypto.randomBytes(32)
     const insertNewUser = await db.query('INSERT INTO account (username, display_name, password, salt, access_key, secret_key) values (?, ?, ?, ?, ? ,?);', [username, display_name, hashed_password, salt, access_key, secret_key]);
-    
+
     // let insertUser = await db.query('INSERT INTO account (user)')
     const user_id = insertNewUser.insertId;
     let uniqueSessionId = false;
     let session_id;
-    do{
-      session_id = makeid(126);
+    do {
+      session_id = makeid(128);
       let session = await db.query('SELECT * FROM session WHERE session_id = ?;', [session_id]);
       if (session.length === 0) uniqueSessionId = true;
-    }while(!uniqueSessionId);
+    } while (!uniqueSessionId);
 
     // Insert session 
-    const result = await db.query('INSERT INTO session (user_id, session_id) values (?, ?);', [user_id, session_id]);
+    const csrf_token = makeid(128);
+    const result = await db.query('INSERT INTO session (user_id, session_id, csrf_token) values (?, ?, ?);', [user_id, session_id, csrf_token]);
 
     res.cookie('session_id', session_id, cookieOptions);
-    res.json({ user: {user_id: user_id, username: username, display_name: display_name, balance: 0} });
-    
+    res.json({ user: { user_id: user_id, username: username, display_name: display_name, balance: 0, csrf_token: csrf_token } });
+
   } catch (error) {
     console.log(error)
     return res.status(500).json({ error: error });
@@ -177,49 +201,67 @@ router.post('/register', async (req, res) => {
 
 
 router.post('/payment-info', async (req, res) => {
+  
   try {
-    const requestId = req.body.requestId;
+    
+    const {error, value} = Joi.validate(req.body, {
+      requestId: schemas.requestId
+    })
+    if (error) {
+      var errorDetails = error.details[0];
+      var msg = `${errorDetails.path.join('.')}: ${errorDetails.message}`;
+      return res.status(200).json({ error: msg });
+    }
+    const { requestId } = value;
     // const conn = await db.getConnection();
     let request = await db.query('\
       SELECT pr.*, a.display_name, t.transaction_count \
       FROM payment_request AS pr,account AS a, \
       (SELECT count(*) AS transaction_count FROM transactions WHERE payment_request_id = ?) AS t \
       WHERE pr.recipient = a.user_id AND pr.request_id = ? AND pr.expired_at > CURRENT_TIMESTAMP;', [requestId, requestId]);
-    if(request.length !== 1) return res.json({ error: 'Payment request is not found or expired.' });
-    if(request[0].transaction_count > 0) return res.json({ error: 'Payment has already been completed.' });
-    res.json({request: request[0]});
+    if (request.length !== 1) return res.json({ error: 'Payment request is not found or expired.' });
+    if (request[0].transaction_count > 0) return res.json({ error: 'Payment has already been completed.' });
+    res.json({ request: request[0] });
   } catch (error) {
     return res.status(500).json({ error: error });
   }
 });
 
-router.post('/pay-with-account-balance', AuthMWs.isAuthenticated, async (req, res) => {
+router.post('/pay-with-account-balance', [AuthMWs.isAuthenticated, AuthMWs.verifyCsrfToken], async (req, res) => {
   try {
-    const requestId = req.body.requestId;
+    const {error, value} = Joi.validate(req.body, {
+      requestId: schemas.requestId
+    })
+    if (error) {
+      var errorDetails = error.details[0];
+      var msg = `${errorDetails.path.join('.')}: ${errorDetails.message}`;
+      return res.status(200).json({ error: msg });
+    }
+    const { requestId } = value;
     // const conn = await db.getConnection();
     let request = await db.query('\
       SELECT pr.*, t.transaction_count \
       FROM payment_request AS pr, \
       (SELECT count(*) AS transaction_count FROM transactions WHERE payment_request_id = ?) AS t \
       WHERE pr.request_id = ? AND pr.expired_at > CURRENT_TIMESTAMP;', [requestId, requestId]);
-    if(request.length !== 1) return res.json({ error: 'Payment failed, due to the invalid payment request.' });
-    if(request[0].transaction_count > 0) return res.json({ error: 'Payment failed, because it has already been paid.' });
+    if (request.length !== 1) return res.json({ error: 'Payment failed, due to the invalid payment request.' });
+    if (request[0].transaction_count > 0) return res.json({ error: 'Payment failed, because it has already been paid.' });
 
     let user = await db.query('SELECT user_id, balance FROM account WHERE user_id = ?;', req.user_id);
 
-    if(user.length !== 1) 
+    if (user.length !== 1)
       return res.json({ error: 'Payment failed, due to the invalid payer.' });
-    if(user[0].balance < request[0].amount) 
+    if (user[0].balance < request[0].amount)
       return res.json({ error: 'Payment failed, due to the insufficient balance.' });
     let insertTransaction = await db.query('INSERT INTO transactions (payment_request_id, paid_by) values (?,?)', [requestId, req.user_id]);
     let updateBalance = await db.query('UPDATE account SET balance = balance - ? WHERE user_id = ?;', [request[0].amount, req.user_id]);
-    res.json({transaction_id: insertTransaction.insertId});
+    res.json({ transaction_id: insertTransaction.insertId });
   } catch (error) {
     return res.status(200).json({ error: error });
   }
 });
 
-router.post('/logout', AuthMWs.isAuthenticated, async (req, res, next) => {
+router.post('/logout', [AuthMWs.isAuthenticated, AuthMWs.verifyCsrfToken], async (req, res, next) => {
 
   try {
     // const conn = await db.getConnection();
@@ -231,14 +273,15 @@ router.post('/logout', AuthMWs.isAuthenticated, async (req, res, next) => {
     console.log(error)
     return res.status(500).json({ error: error });
   }
- 
+
 });
 
 
 router.post('/my-profile', AuthMWs.isAuthenticated, async (req, res, next) => {
   try {
     // const conn = await db.getConnection();
-    let user = await db.query('SELECT user_id, username, display_name, balance FROM account WHERE user_id = ?;', req.user_id);
+    let user = await db.query('SELECT a.user_id, a.username, a.display_name, a.balance, s.csrf_token \
+      FROM account AS a LEFT JOIN session AS s  ON  a.user_id = s.user_id WHERE a.user_id = ?', req.user_id);
     if (user.length === 0) return res.json({ error: 'Unauthorized' });
     res.json({ user: user[0] });
   } catch (error) {
@@ -254,28 +297,40 @@ router.post('/transactions', AuthMWs.isAuthenticated, async (req, res) => {
       SELECT t.transaction_id, t.paid_at, pr.amount, pr.description, a.display_name as recipient_name \
       FROM transactions AS t, payment_request AS pr, account as a  \
       WHERE t.payment_request_id = pr.request_id AND pr.recipient = a.user_id AND t.paid_by = ? ORDER BY t.paid_at DESC;', req.user_id);
-    res.json({ transactions: transactions});
+    res.json({ transactions: transactions });
   } catch (error) {
     return res.status(500).json({ error: error });
   }
 })
 
-router.post('/create-request', AuthMWs.isAuthenticated, async (req, res) => {
+router.post('/create-request', [AuthMWs.isAuthenticated, AuthMWs.verifyCsrfToken], async (req, res) => {
   try {
-    const { amount, description } = req.body;
-    let lifetime = req.body.lifetime;
+    const {error, value} = Joi.validate(req.body, {
+      amount: schemas.amount,
+      description: schemas.description,
+      lifetime: schemas.lifetime
+    });
+    if (error) {
+      var errorDetails = error.details[0];
+      var msg = `${errorDetails.path.join('.')}: ${errorDetails.message}`;
+      return res.status(200).json({ error: msg });
+    }
 
-    if(lifetime){
+    const { amount, description } = value;
+    let lifetime = value.lifetime;
+
+    if (lifetime) {
       lifetime = parseInt(lifetime);
-    }else{
+    } else {
       lifetime = 1
     }
-    var EXPIRED_AT = { toSqlString: function() { return `NOW() + INTERVAL ${lifetime} HOUR`; } };
+
+    var EXPIRED_AT = { toSqlString: function () { return `NOW() + INTERVAL ${lifetime} HOUR`; } };
 
     // Insert request row
     const insertRequest = await db.query('INSERT INTO payment_request (recipient, amount, description, expired_at) values (?, ?, ?, ?);', [req.user_id, amount, description, EXPIRED_AT]);
     let request = await db.query('SELECT * FROM payment_request WHERE request_id = ? LIMIT 1;', insertRequest.insertId);
-    if(request.length === 0) return res.json({ error: 'Database error' });
+    if (request.length === 0) return res.json({ error: 'Database error' });
     res.json({ request: request[0] });
   } catch (error) {
     console.log(error)
@@ -292,7 +347,7 @@ router.post('/payment-requests', AuthMWs.isAuthenticated, async (req, res) => {
       LEFT JOIN (SELECT payment_request_id, count(DISTINCT payment_request_id) AS transaction_count FROM transactions GROUP BY payment_request_id) AS t \
       ON t.payment_request_id = pr.request_id \
       WHERE pr.recipient = ? ORDER BY pr.created_at DESC;', req.user_id);
-    res.json({ requests: requests});
+    res.json({ requests: requests });
   } catch (error) {
     console.log(error)
     return res.status(500).json({ error: error });

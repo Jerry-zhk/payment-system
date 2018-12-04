@@ -8,7 +8,7 @@ const setup = (req, res, next) => {
   const { session_id } = req.body;
   if (session_id) {
     if (sessions.hasOwnProperty(session_id)) next();
-    else return res.status(400).json({ code: 1235 });
+    else return res.status(200).json({ error: 'Invalid session ID' });
   } else {
     const { type } = req.body;
     switch (type) {
@@ -23,6 +23,7 @@ const setup = (req, res, next) => {
         // Diffie hellman keys for hmac
         const hmac_clientKey = crypto.decryptWithRSA(req.body.hmac_clientKey);
         const hmac_keys = crypto.generateSessionKeys(hmac_clientKey);
+
         const session_id = Date.now() + Math.floor(Math.random() * 1000);
         const keys = {
           cipherKey: crypto.sha256(cipher_keys.sessionKey),
@@ -30,15 +31,20 @@ const setup = (req, res, next) => {
         };
         sessions[session_id] = keys;
 
+
+        const cipherKey_hmac = crypto.hmac(keys.cipherKey, cipher_keys.serverKey.toString('hex'));
+        const hmacKey_hmac = crypto.hmac(keys.hmacKey, hmac_keys.serverKey.toString('hex'));
+
         return res.status(200).json({ 
-          code: 1,
           session_id: session_id,
           cipherKey: cipher_keys.serverKey.toString('hex'),
+          cipherKey_hmac: cipherKey_hmac,
           hmacKey: hmac_keys.serverKey.toString('hex'),
+          hmacKey_hmac: hmacKey_hmac
          });
     }
-    return res.status(400).json({ code: 1235 });
-  }
+    return res.status(200).json({ error: 'Bad request' });
+  } 
 };
 
 // Decrypt data
@@ -53,7 +59,7 @@ const decryptRequestBody = (req, res, next) => {
     const hmacComputed = crypto.hmac(keys.hmacKey, dataWithHMAC.data)
     if(dataWithHMAC.hmac !== hmacComputed){
       // HMAC verification failed, data was changed
-      return res.status(400).json({ code: 1222 });
+      return res.status(200).json({ error: 'Data corrupted' });
     }
     req.body = JSON.parse(dataWithHMAC.data);
   }
