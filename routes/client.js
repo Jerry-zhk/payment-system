@@ -124,7 +124,7 @@ router.post('/register', async (req, res) => {
 
   } catch (error) {
     console.log(error)
-    return res.status(500).json({ error: error });
+    return res.status(200).json({ error: error });
   }
 
 });
@@ -223,7 +223,7 @@ router.post('/payment-info', async (req, res) => {
     if (request[0].transaction_count > 0) return res.json({ error: 'Payment has already been completed.' });
     res.json({ request: request[0] });
   } catch (error) {
-    return res.status(500).json({ error: error });
+    return res.status(200).json({ error: error });
   }
 });
 
@@ -254,7 +254,8 @@ router.post('/pay-with-account-balance', [AuthMWs.isAuthenticated, AuthMWs.verif
     if (user[0].balance < request[0].amount)
       return res.json({ error: 'Payment failed, due to the insufficient balance.' });
     let insertTransaction = await db.query('INSERT INTO transactions (payment_request_id, paid_by) values (?,?)', [requestId, req.user_id]);
-    let updateBalance = await db.query('UPDATE account SET balance = balance - ? WHERE user_id = ?;', [request[0].amount, req.user_id]);
+    let updatePayerBalance = await db.query('UPDATE account SET balance = balance - ? WHERE user_id = ?;', [request[0].amount, req.user_id]);
+    let updateRecipientBalance = await db.query('UPDATE account SET balance = balance + ? WHERE user_id = ?;', [request[0].amount, request[0].recipient]);
     res.json({ transaction_id: insertTransaction.insertId });
   } catch (error) {
     return res.status(200).json({ error: error });
@@ -262,16 +263,16 @@ router.post('/pay-with-account-balance', [AuthMWs.isAuthenticated, AuthMWs.verif
 });
 
 router.post('/logout', [AuthMWs.isAuthenticated, AuthMWs.verifyCsrfToken], async (req, res, next) => {
-
+console.log('hi')
   try {
     // const conn = await db.getConnection();
     let logout = await db.query('DELETE FROM session WHERE user_id = ?;', req.user_id);
-    if (logout.length === 0) return res.status(401).json({ message: 'Unauthorized' });
+    if (logout.length === 0) return res.status(200).json({ error: 'Unauthorized' });
     res.clearCookie('session_id');
     res.json({ message: 'User has logged out' });
   } catch (error) {
     console.log(error)
-    return res.status(500).json({ error: error });
+    return res.status(200).json({ error: error });
   }
 
 });
@@ -286,7 +287,7 @@ router.post('/my-profile', AuthMWs.isAuthenticated, async (req, res, next) => {
     res.json({ user: user[0] });
   } catch (error) {
     console.log(error)
-    return res.status(500).json({ error: error });
+    return res.status(200).json({ error: error });
   }
 })
 
@@ -299,7 +300,7 @@ router.post('/transactions', AuthMWs.isAuthenticated, async (req, res) => {
       WHERE t.payment_request_id = pr.request_id AND pr.recipient = a.user_id AND t.paid_by = ? ORDER BY t.paid_at DESC;', req.user_id);
     res.json({ transactions: transactions });
   } catch (error) {
-    return res.status(500).json({ error: error });
+    return res.status(200).json({ error: error });
   }
 })
 
@@ -334,7 +335,7 @@ router.post('/create-request', [AuthMWs.isAuthenticated, AuthMWs.verifyCsrfToken
     res.json({ request: request[0] });
   } catch (error) {
     console.log(error)
-    return res.status(500).json({ error: error });
+    return res.status(200).json({ error: error });
   }
 })
 
@@ -350,7 +351,32 @@ router.post('/payment-requests', AuthMWs.isAuthenticated, async (req, res) => {
     res.json({ requests: requests });
   } catch (error) {
     console.log(error)
-    return res.status(500).json({ error: error });
+    return res.status(200).json({ error: error });
+  }
+})
+
+router.post('/add-value', [AuthMWs.isAuthenticated, AuthMWs.verifyCsrfToken], async (req, res) => {
+  try {
+    const {error, value} = Joi.validate(req.body, {
+      amount: schemas.amount,
+      code: schemas.gift_card_code
+    });
+    if (error) {
+      var errorDetails = error.details[0];
+      var msg = `${errorDetails.path.join('.')}: ${errorDetails.message}`;
+      return res.status(200).json({ error: msg });
+    }
+
+    const {amount, code} = value;
+    const gift_card = await db.query('SELECT * FROM gift_card WHERE code = ? AND amount = ? AND expired_at > CURRENT_TIMESTAMP', [code, amount]);
+    if (gift_card.length === 0) return res.json({ error: 'Invalid gift card' });
+    await db.query('UPDATE account SET balance = balance + ? WHERE user_id = ?', [amount, req.user_id]);
+    await db.query('DELETE FROM gift_card WHERE card_id = ?', gift_card[0].card_id);
+    res.json({success: true});
+
+  } catch (error) {
+    console.log(error)
+    return res.status(200).json({ error: error });
   }
 })
 

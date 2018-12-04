@@ -11,9 +11,11 @@ const requestId = Joi.number().required();
 
 const amount = Joi.number().min(0).required();
 
-const description = Joi.string().allow('');
+const description = Joi.string().regex(/^[A-Za-z0-9 ]+$/).allow('');
 
-const lifetime = Joi.number().min(0).optional();
+const lifetime = Joi.number().min(0).allow(null);
+
+const gift_card_code = Joi.string().length(64).required();
 
 module.exports = {
   username,
@@ -22,5 +24,6 @@ module.exports = {
   requestId,
   amount,
   description,
-  lifetime
+  lifetime,
+  gift_card_code
 }
