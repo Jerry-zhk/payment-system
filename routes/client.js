@@ -63,7 +63,9 @@ router.post('/login', async (req, res, next) => {
     const result = await db.query('INSERT INTO session (user_id, session_id, csrf_token) values (?, ?, ?);', [user_id, session_id, csrf_token]);
 
     res.cookie('session_id', session_id, cookieOptions);
-    res.json({ user: user[0] });
+    let userObj = user[0];
+    userObj.csrf_token = csrf_token;
+    res.json({ user: userObj });
 
   } catch (error) {
     console.log(error)
@@ -263,7 +265,6 @@ router.post('/pay-with-account-balance', [AuthMWs.isAuthenticated, AuthMWs.verif
 });
 
 router.post('/logout', [AuthMWs.isAuthenticated, AuthMWs.verifyCsrfToken], async (req, res, next) => {
-console.log('hi')
   try {
     // const conn = await db.getConnection();
     let logout = await db.query('DELETE FROM session WHERE user_id = ?;', req.user_id);
